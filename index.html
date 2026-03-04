@@ -33,23 +33,46 @@
         </div>
     </div>
     <script>
-        $(function() {
-            var socket = new WebSocket("wss://websoket-haris.herokuapp.com/ws?username=" + encodeURIComponent($('#username').val()));
+        // $(function() {
+        //     var socket = new WebSocket("wss://websoket-haris.herokuapp.com/ws?username=" + encodeURIComponent($('#username').val()));
 
-            socket.onmessage = function(event) {
-                var message = JSON.parse(event.data);
-                var content = "<strong>" + message.username + ":</strong> " + message.content + "<br />";
-                $('#messages').append(content);
-            };
+        //     socket.onmessage = function(event) {
+        //         var message = JSON.parse(event.data);
+        //         var content = "<strong>" + message.username + ":</strong> " + message.content + "<br />";
+        //         $('#messages').append(content);
+        //     };
 
-            $('#send').click(function() {
-                var message = {
-                    username: $('#username').val(),
-                    content: $('#message').val()
-                };
-                socket.send(JSON.stringify(message));
-                $('#message').val('');
-            });
+        //     $('#send').click(function() {
+        //         var message = {
+        //             username: $('#username').val(),
+        //             content: $('#message').val()
+        //         };
+        //         socket.send(JSON.stringify(message));
+        //         $('#message').val('');
+        //     });
+        // });
+
+        let socket;
+
+        function connect() {
+        const u = $('#username').val().trim();
+        if (!u) return alert("Isi username dulu");
+
+        socket = new WebSocket("wss://ws.postman-echo.com/raw"); // atau echo lain
+
+        socket.onmessage = function (event) {
+            // echo server balikin string yang kamu kirim
+            const message = JSON.parse(event.data);
+            $('#messages').append(`<strong>${message.username}:</strong> ${message.content}<br/>`);
+        };
+        }
+
+        $('#send').click(function () {
+        if (!socket || socket.readyState !== 1) connect();
+
+        const message = { username: $('#username').val(), content: $('#message').val() };
+        socket.send(JSON.stringify(message));
+        $('#message').val('');
         });
     </script>
 </body>
