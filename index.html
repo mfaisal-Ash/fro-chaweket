@@ -6,73 +6,145 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://kit.fontawesome.com/894d95a0a5.js" crossorigin="anonymous"></script>
     <link href="./asset/css/style.css" rel="stylesheet">
- <style>
- body {
-    font-family: 'Times New Roman', Times, serif;
-    flex: 1;
-    padding: 20px 30px;
-    background-image: url('./asset/orange.jpg');
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-    height: 100vh;
-}
-</style>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            flex: 1;
+            padding: 20px 30px;
+            background-image: url('./asset/orange.jpg');
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+            min-height: 100vh;
+        }
+    </style>
 </head>
 <body>
     <div class="container mx-auto py-8">
         <h1 class="chat-header">ChaWeKet - Chat Websocket</h1>
+
         <div class="chat-card">
             <div class="user" id="messages"></div>
         </div>
-        <div class="input-group">
-            <input type="text" id="username" class="flex-1 mr-2 p-2 border border-gray-300 rounded" placeholder="Username">
-            <input type="text" id="message" class="flex-1 mr-2 p-2 border border-gray-300 rounded" placeholder="Message">
-            <button type="solid" id="send"><i class="fa-solid fa-paper-plane-top">></i></button>
-            
+
+        <div class="input-group mt-4 flex gap-2">
+            <input type="text" id="username" class="flex-1 p-2 border border-gray-300 rounded" placeholder="Username">
+            <input type="text" id="message" class="flex-1 p-2 border border-gray-300 rounded" placeholder="Message">
+            <button type="button" id="send" class="px-4 py-2 bg-blue-500 text-white rounded">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </div>
+
+        <div class="mt-3">
+            <button type="button" id="connectBtn" class="px-4 py-2 bg-green-600 text-white rounded">Connect</button>
+            <span id="status" class="ml-3 text-sm text-white font-bold">Belum terhubung</span>
         </div>
     </div>
+
     <script>
-        // $(function() {
-        //     var socket = new WebSocket("wss://websoket-haris.herokuapp.com/ws?username=" + encodeURIComponent($('#username').val()));
+        let socket = null;
+        const backendBase = "https://go-websocket-git-566265945037.asia-southeast2.run.app";
 
-        //     socket.onmessage = function(event) {
-        //         var message = JSON.parse(event.data);
-        //         var content = "<strong>" + message.username + ":</strong> " + message.content + "<br />";
-        //         $('#messages').append(content);
-        //     };
-
-        //     $('#send').click(function() {
-        //         var message = {
-        //             username: $('#username').val(),
-        //             content: $('#message').val()
-        //         };
-        //         socket.send(JSON.stringify(message));
-        //         $('#message').val('');
-        //     });
-        // });
-
-        let socket;
-
-        function connect() {
-        const u = $('#username').val().trim();
-        if (!u) return alert("Isi username dulu");
-
-        socket = new WebSocket("wss://ws.postman-echo.com/raw"); // atau echo lain
-
-        socket.onmessage = function (event) {
-            // echo server balikin string yang kamu kirim
-            const message = JSON.parse(event.data);
-            $('#messages').append(`<strong>${message.username}:</strong> ${message.content}<br/>`);
-        };
+        function getWsUrl(username) {
+            const url = new URL(backendBase);
+            url.protocol = "wss:";
+            url.pathname = "/ws";
+            url.searchParams.set("username", username);
+            return url.toString();
         }
 
-        $('#send').click(function () {
-        if (!socket || socket.readyState !== 1) connect();
+        function appendMessage(username, content) {
+            $('#messages').append(
+                `<div class="mb-2"><strong>${escapeHtml(username)}:</strong> ${escapeHtml(content)}</div>`
+            );
+            const messagesDiv = document.getElementById("messages");
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
 
-        const message = { username: $('#username').val(), content: $('#message').val() };
-        socket.send(JSON.stringify(message));
-        $('#message').val('');
+        function escapeHtml(text) {
+            return String(text)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function connect() {
+            const username = $('#username').val().trim();
+            if (!username) {
+                alert("Isi username dulu");
+                return;
+            }
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                return;
+            }
+
+            socket = new WebSocket(getWsUrl(username));
+
+            socket.onopen = function () {
+                $('#status').text("Terhubung");
+            };
+
+            socket.onmessage = function (event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    appendMessage(message.username || "unknown", message.content || event.data);
+                } catch (e) {
+                    appendMessage("server", event.data);
+                }
+            };
+
+            socket.onclose = function () {
+                $('#status').text("Terputus");
+            };
+
+            socket.onerror = function () {
+                $('#status').text("Error koneksi");
+            };
+        }
+
+        $('#connectBtn').click(function () {
+            connect();
+        });
+
+        $('#send').click(function () {
+            const username = $('#username').val().trim();
+            const content = $('#message').val().trim();
+
+            if (!username) {
+                alert("Isi username dulu");
+                return;
+            }
+
+            if (!content) {
+                return;
+            }
+
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                connect();
+
+                setTimeout(() => {
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({ username, content }));
+                        $('#message').val('');
+                    } else {
+                        alert("WebSocket belum terhubung");
+                    }
+                }, 500);
+
+                return;
+            }
+
+            socket.send(JSON.stringify({ username, content }));
+            $('#message').val('');
+        });
+
+        $('#message').keypress(function (e) {
+            if (e.which === 13) {
+                $('#send').click();
+            }
         });
     </script>
 </body>
